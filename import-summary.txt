@@ -1,0 +1,163 @@
+ECLIPSE ANDROID PROJECT IMPORT SUMMARY
+======================================
+
+Ignored Files:
+--------------
+The following files were *not* copied into the new Gradle project; you
+should evaluate whether these are still needed in your project and if
+so manually move them:
+
+* ant.properties
+* build.xml
+* jni_bk\
+* jni_bk\AAPlayer.cpp
+* jni_bk\AAPlayer.h
+* jni_bk\Android.mk
+* jni_bk\Application.mk
+* jni_bk\GLProgram.cpp
+* jni_bk\GLRGBARender.cpp
+* jni_bk\GLRender.cpp
+* jni_bk\GLTexture2d.cpp
+* jni_bk\GLVideoJni.cpp
+* jni_bk\GLVideoJni.h
+* jni_bk\PlayAudio.cpp
+* jni_bk\VideoJni.cpp
+* jni_bk\VideoJni.h
+* jni_bk\ffmpeg\
+* jni_bk\ffmpeg\include\
+* jni_bk\ffmpeg\include\libavcodec\
+* jni_bk\ffmpeg\include\libavcodec\avcodec.h
+* jni_bk\ffmpeg\include\libavcodec\avfft.h
+* jni_bk\ffmpeg\include\libavcodec\dxva2.h
+* jni_bk\ffmpeg\include\libavcodec\old_codec_ids.h
+* jni_bk\ffmpeg\include\libavcodec\vaapi.h
+* jni_bk\ffmpeg\include\libavcodec\vda.h
+* jni_bk\ffmpeg\include\libavcodec\vdpau.h
+* jni_bk\ffmpeg\include\libavcodec\version.h
+* jni_bk\ffmpeg\include\libavcodec\xvmc.h
+* jni_bk\ffmpeg\include\libavfilter\
+* jni_bk\ffmpeg\include\libavfilter\asrc_abuffer.h
+* jni_bk\ffmpeg\include\libavfilter\avcodec.h
+* jni_bk\ffmpeg\include\libavfilter\avfilter.h
+* jni_bk\ffmpeg\include\libavfilter\avfiltergraph.h
+* jni_bk\ffmpeg\include\libavfilter\buffersink.h
+* jni_bk\ffmpeg\include\libavfilter\buffersrc.h
+* jni_bk\ffmpeg\include\libavfilter\version.h
+* jni_bk\ffmpeg\include\libavformat\
+* jni_bk\ffmpeg\include\libavformat\avformat.h
+* jni_bk\ffmpeg\include\libavformat\avio.h
+* jni_bk\ffmpeg\include\libavformat\version.h
+* jni_bk\ffmpeg\include\libavutil\
+* jni_bk\ffmpeg\include\libavutil\adler32.h
+* jni_bk\ffmpeg\include\libavutil\aes.h
+* jni_bk\ffmpeg\include\libavutil\attributes.h
+* jni_bk\ffmpeg\include\libavutil\audio_fifo.h
+* jni_bk\ffmpeg\include\libavutil\audioconvert.h
+* jni_bk\ffmpeg\include\libavutil\avassert.h
+* jni_bk\ffmpeg\include\libavutil\avconfig.h
+* jni_bk\ffmpeg\include\libavutil\avstring.h
+* jni_bk\ffmpeg\include\libavutil\avutil.h
+* jni_bk\ffmpeg\include\libavutil\base64.h
+* jni_bk\ffmpeg\include\libavutil\blowfish.h
+* jni_bk\ffmpeg\include\libavutil\bprint.h
+* jni_bk\ffmpeg\include\libavutil\bswap.h
+* jni_bk\ffmpeg\include\libavutil\buffer.h
+* jni_bk\ffmpeg\include\libavutil\channel_layout.h
+* jni_bk\ffmpeg\include\libavutil\common.h
+* jni_bk\ffmpeg\include\libavutil\cpu.h
+* jni_bk\ffmpeg\include\libavutil\crc.h
+* jni_bk\ffmpeg\include\libavutil\dict.h
+* jni_bk\ffmpeg\include\libavutil\downmix_info.h
+* jni_bk\ffmpeg\include\libavutil\error.h
+* jni_bk\ffmpeg\include\libavutil\eval.h
+* jni_bk\ffmpeg\include\libavutil\ffversion.h
+* jni_bk\ffmpeg\include\libavutil\fifo.h
+* jni_bk\ffmpeg\include\libavutil\file.h
+* jni_bk\ffmpeg\include\libavutil\frame.h
+* jni_bk\ffmpeg\include\libavutil\hmac.h
+* jni_bk\ffmpeg\include\libavutil\imgutils.h
+* jni_bk\ffmpeg\include\libavutil\intfloat.h
+* jni_bk\ffmpeg\include\libavutil\intfloat_readwrite.h
+* jni_bk\ffmpeg\include\libavutil\intreadwrite.h
+* jni_bk\ffmpeg\include\libavutil\lfg.h
+* jni_bk\ffmpeg\include\libavutil\log.h
+* jni_bk\ffmpeg\include\libavutil\lzo.h
+* jni_bk\ffmpeg\include\libavutil\macros.h
+* jni_bk\ffmpeg\include\libavutil\mathematics.h
+* jni_bk\ffmpeg\include\libavutil\md5.h
+* jni_bk\ffmpeg\include\libavutil\mem.h
+* jni_bk\ffmpeg\include\libavutil\murmur3.h
+* jni_bk\ffmpeg\include\libavutil\old_pix_fmts.h
+* jni_bk\ffmpeg\include\libavutil\opt.h
+* jni_bk\ffmpeg\include\libavutil\parseutils.h
+* jni_bk\ffmpeg\include\libavutil\pixdesc.h
+* jni_bk\ffmpeg\include\libavutil\pixfmt.h
+* jni_bk\ffmpeg\include\libavutil\random_seed.h
+* jni_bk\ffmpeg\include\libavutil\rational.h
+* jni_bk\ffmpeg\include\libavutil\replaygain.h
+* jni_bk\ffmpeg\include\libavutil\ripemd.h
+* jni_bk\ffmpeg\include\libavutil\samplefmt.h
+* jni_bk\ffmpeg\include\libavutil\sha.h
+* jni_bk\ffmpeg\include\libavutil\sha512.h
+* jni_bk\ffmpeg\include\libavutil\stereo3d.h
+* jni_bk\ffmpeg\include\libavutil\time.h
+* jni_bk\ffmpeg\include\libavutil\timecode.h
+* jni_bk\ffmpeg\include\libavutil\timestamp.h
+* jni_bk\ffmpeg\include\libavutil\version.h
+* jni_bk\ffmpeg\include\libavutil\xtea.h
+* jni_bk\ffmpeg\include\libswresample\
+* jni_bk\ffmpeg\include\libswresample\swresample.h
+* jni_bk\ffmpeg\include\libswresample\version.h
+* jni_bk\ffmpeg\include\libswscale\
+* jni_bk\ffmpeg\include\libswscale\swscale.h
+* jni_bk\ffmpeg\include\libswscale\version.h
+* jni_bk\ffmpeg\lib\
+* jni_bk\ffmpeg\lib\libavcodec.a
+* jni_bk\ffmpeg\lib\libavfilter.a
+* jni_bk\ffmpeg\lib\libavformat.a
+* jni_bk\ffmpeg\lib\libavutil.a
+* jni_bk\ffmpeg\lib\libswresample.a
+* jni_bk\ffmpeg\lib\libswscale.a
+* jni_bk\ffmpeg\lib\pkgconfig\
+* jni_bk\ffmpeg\lib\pkgconfig\libavcodec.pc
+* jni_bk\ffmpeg\lib\pkgconfig\libavfilter.pc
+* jni_bk\ffmpeg\lib\pkgconfig\libavformat.pc
+* jni_bk\ffmpeg\lib\pkgconfig\libavutil.pc
+* jni_bk\ffmpeg\lib\pkgconfig\libswresample.pc
+* jni_bk\ffmpeg\lib\pkgconfig\libswscale.pc
+* jni_bk\include\
+* jni_bk\include\GLProgram.h
+* jni_bk\include\GLRGBARender.h
+* jni_bk\include\GLRender.h
+* jni_bk\include\GLTexture2d.h
+* jni_bk\include\Image.h
+* jni_bk\include\SelfDef.h
+* jni_bk\include\jnilogger.h
+* proguard-project.txt
+
+Moved Files:
+------------
+Android Gradle projects use a different directory structure than ADT
+Eclipse projects. Here's how the projects were restructured:
+
+* AndroidManifest.xml => app\src\main\AndroidManifest.xml
+* assets\ => app\src\main\assets
+* jni\ => app\src\main\jni\
+* libs\armeabi-v7a\libaamediaplayer.so => app\src\main\jniLibs\armeabi-v7a\libaamediaplayer.so
+* res\ => app\src\main\res\
+* src\ => app\src\main\java\
+
+Next Steps:
+-----------
+You can now build the project. The Gradle project needs network
+connectivity to download dependencies.
+
+Bugs:
+-----
+If for some reason your project does not build, and you determine that
+it is due to a bug or limitation of the Eclipse to Gradle importer,
+please file a bug at http://b.android.com with category
+Component-Tools.
+
+(This import summary is for your information only, and can be deleted
+after import once you are satisfied with the results.)

@@ -1,0 +1,24 @@
+apply plugin: 'com.android.application'
+
+android {
+    compileSdkVersion 18
+    buildToolsVersion "23.0.0 rc3"
+
+    defaultConfig {
+        applicationId "com.angzangy.video"
+        minSdkVersion 14
+        targetSdkVersion 14
+    }
+
+    sourceSets.main{
+        jniLibs.srcDir "libs"
+        jni.srcDirs = []
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.txt'
+        }
+    }
+}
