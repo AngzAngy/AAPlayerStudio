@@ -67,6 +67,8 @@ LOCAL_SRC_FILES := \
     decoder_video.cpp \
     thread.cpp \
     image-util.cpp \
+    AudioTrack.cpp \
+    SLESAudioTrack.cpp \
     PlayAudio.cpp \
     VideoJni.cpp \
     GLVideoJni.cpp

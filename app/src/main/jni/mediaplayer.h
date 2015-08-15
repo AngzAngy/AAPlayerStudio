@@ -9,6 +9,7 @@
 #include "decoder_audio.h"
 #include "decoder_video.h"
 #include "gles/include/Image.h"
+#include "AudioTrack.h"
 
 #define FFMPEG_PLAYER_MAX_QUEUE_SIZE 10
 
@@ -183,6 +184,7 @@ private:
 	AVFrame*					mAudioFrame;
 	struct SwsContext*			mVideoConvertCtx;
 	struct SwrContext*          mAudioSwrCtx;
+    AudioTrack *                mAudioTrack;
 
     void*                       mCookie;
     media_player_states         mCurrentState;

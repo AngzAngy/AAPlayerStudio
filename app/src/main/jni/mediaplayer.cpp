@@ -27,9 +27,11 @@ extern "C" {
 #include <android/log.h>
 
 #include "mediaplayer.h"
+#include "SLESAudioTrack.h"
 #include "output.h"
 #include "jnilogger.h"
 #include "image-util.h"
+#include "SelfDef.h"
 
 #define FPS_DEBUGGING true
 
@@ -61,6 +63,7 @@ MediaPlayer::MediaPlayer()
     mAudioFrame = NULL;
     mVideoQueue = NULL;
     mVideoFrame = NULL;
+    mAudioTrack = NULL;
 
     av_register_all();
 }
@@ -483,12 +486,14 @@ void MediaPlayer::decodeAudio2CB(void* userdata){
 void MediaPlayer::playAudio2(){
     int got_frame = 0;
     int data_size = 0;
+    if(!mAudioTrack){
+        return;
+    }
     AVStream* stream = mMovieFile->streams[mAudioStreamIndex];
     AVCodecContext* codec_ctx = stream->codec;
     if(mAudioSwrCtx==NULL){
         mAudioSwrCtx = swr_alloc_set_opts(NULL,
             codec_ctx->channel_layout, AV_SAMPLE_FMT_S16, 44100,
-
             codec_ctx->channel_layout,
             codec_ctx->sample_fmt ,
             codec_ctx->sample_rate,
@@ -518,9 +523,8 @@ void MediaPlayer::playAudio2(){
                  &mRawAudioBuf, mAudioFrame->nb_samples,
                  (const uint8_t**)mAudioFrame->data, mAudioFrame->nb_samples);
 
-         Output::writeAudioBuf(mRawAudioBuf, data_size);
+         mAudioTrack->write(mRawAudioBuf, 0, data_size);
      }
-
     av_free_packet(&mAudioPacket);
 }
 
@@ -567,16 +571,25 @@ void MediaPlayer::decodeMovie(void* ptr)
 {
 	AVPacket pPacket;
 	
-	AVStream* stream_audio = mMovieFile->streams[mAudioStreamIndex];
+//	AVStream* stream_audio = mMovieFile->streams[mAudioStreamIndex];
 //	mDecoderAudio = new DecoderAudio(stream_audio);
 //	mDecoderAudio->onDecode = decodeAudioCB;
 //	mDecoderAudio->userData=this;
 //	mDecoderAudio->startAsync();
-	mAudioFrame = av_frame_alloc();
-	mAudioQueue = new PacketQueue();
-    Output::createAudioEngine();
-    Output::setAudioCallback(decodeAudio2CB, this);
-    Output::createBufferQueueAudioPlayer(44100, stream_audio->codec->channels, SL_PCMSAMPLEFORMAT_FIXED_16);
+    if(mAudioStreamIndex) {
+        AVStream* stream_audio = mMovieFile->streams[mAudioStreamIndex];
+        mAudioTrack = new SLESAudioTrack(44100, SL_PCMSAMPLEFORMAT_FIXED_16, stream_audio->codec->channels);
+        mAudioTrack->setAudioCallback(decodeAudio2CB, this);
+        mAudioFrame = av_frame_alloc();
+        mAudioQueue = new PacketQueue();
+
+        mAudioTrack->start();
+        char tmp[8];
+        mAudioTrack->write(tmp, 0, 8);
+    }
+//    Output::createAudioEngine();
+//    Output::setAudioCallback(decodeAudio2CB, this);
+//    Output::createBufferQueueAudioPlayer(44100, stream_audio->codec->channels, SL_PCMSAMPLEFORMAT_FIXED_16);
 
     mVideoFrame = av_frame_alloc();
     mVideoQueue = new PacketQueue();
@@ -588,7 +601,6 @@ void MediaPlayer::decodeMovie(void* ptr)
 //	mDecoderVideo->startAsync();
 	
 	mCurrentState = MEDIA_PLAYER_STARTED;
-	__android_log_print(ANDROID_LOG_ERROR, TAG, "playing %ix%i", mVideoWidth, mVideoHeight);
 	while (mCurrentState != MEDIA_PLAYER_DECODED && mCurrentState != MEDIA_PLAYER_STOPPED &&
 		   mCurrentState != MEDIA_PLAYER_STATE_ERROR)
 	{
@@ -633,8 +645,8 @@ void MediaPlayer::decodeMovie(void* ptr)
 	if((ret = mDecoderAudio->wait()) != 0) {
 		__android_log_print(ANDROID_LOG_ERROR, TAG, "Couldn't cancel audio thread: %i", ret);
 	}
-    
-	Output::shutdownAudio();
+
+    deleteC(mAudioTrack);
 	if(mAudioSwrCtx){
 	    swr_free(&mAudioSwrCtx);
 	    mAudioSwrCtx=NULL;
@@ -643,18 +655,14 @@ void MediaPlayer::decodeMovie(void* ptr)
 	    delete []mRawAudioBuf;
 	    mRawAudioBuf=NULL;
 	}
-	if(mAudioQueue){
-	    delete mAudioQueue;
-	    mAudioQueue=NULL;
-	}
+    deleteC(mAudioQueue);
+
 	if(mAudioFrame){
 	    av_free(mAudioFrame);
 	    mAudioFrame = NULL;
 	}
-    if(mVideoQueue){
-        delete mVideoQueue;
-        mVideoQueue=NULL;
-    }
+    deleteC(mVideoQueue);
+
     if(mVideoFrame){
         av_free(mVideoFrame);
         mVideoFrame = NULL;
