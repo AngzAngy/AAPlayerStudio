@@ -3,7 +3,7 @@
 
 #include <pthread.h>
 
-#include <jni.h>
+//#include <jni.h>
 #include "Errors.h"
 
 #include "decoder_audio.h"
@@ -124,7 +124,7 @@ public:
     MediaPlayer();
     ~MediaPlayer();
 	status_t        setDataSource(const char *url);
-	status_t        setVideoSurface(JNIEnv* env, jobject jsurface);
+//	status_t        setVideoSurface(JNIEnv* env, jobject jsurface);
 	status_t        setListener(MediaPlayerListener *listener);
 	status_t        start();
 	status_t        stop();
@@ -154,16 +154,16 @@ private:
 
 	static void 				decodeVideoCB(AVFrame* frame, double pts, void* userdata);
 //	static void 				decodeAudioCB(AVFrame* frame, void* userdata);
-	static void                 decodeAudio2CB(void* userdata);
+	static void                 audioFrameCB(void* userdata);
 
 	status_t					prepareAudio();
 	status_t					prepareVideo();
 	bool						shouldCancel(PacketQueue* queue);
 	void						decodeMovie(void* ptr);
-	void                        showVideo(AVFrame* frame);
+//	void                        showVideo(AVFrame* frame);
 	void                        renderVideo(Image *pImg);
 //	void                        playAudio(AVFrame* frame);
-	void                        playAudio2();
+	void                        decodeAudioFrame();
 	
 	double 						mTime;
 	pthread_mutex_t             mLock;

@@ -28,7 +28,7 @@ extern "C" {
 
 #include "mediaplayer.h"
 #include "SLESAudioTrack.h"
-#include "output.h"
+//#include "output.h"
 #include "jnilogger.h"
 #include "image-util.h"
 #include "SelfDef.h"
@@ -265,7 +265,7 @@ status_t MediaPlayer::suspend() {
 
 	//close OS drivers
 	/*Output::AudioDriver_unregister();*/
-	Output::surface_unregister();
+//	Output::surface_unregister();
 
 	__android_log_print(ANDROID_LOG_ERROR, TAG, "suspended");
 
@@ -279,13 +279,13 @@ status_t MediaPlayer::suspend() {
     return NO_ERROR;
 }*/
 
-status_t MediaPlayer::setVideoSurface(JNIEnv* env, jobject jsurface)
-{ 
-	if(Output::surface_register(env, jsurface) != NO_ERROR) {
-		return INVALID_OPERATION;
-	}
-    return NO_ERROR;
-}
+//status_t MediaPlayer::setVideoSurface(JNIEnv* env, jobject jsurface)
+//{
+//	if(Output::surface_register(env, jsurface) != NO_ERROR) {
+//		return INVALID_OPERATION;
+//	}
+//    return NO_ERROR;
+//}
 
 bool MediaPlayer::shouldCancel(PacketQueue* queue)
 {
@@ -398,43 +398,43 @@ void MediaPlayer::renderVideo(Image *pImg){
 //	/*Output::VideoDriver_updateSurface();*/
 //}
 
-void MediaPlayer::showVideo(AVFrame* frame){
-    if(mVideoConvertCtx == NULL){
-        AVStream* stream = mMovieFile->streams[mVideoStreamIndex];
-        mVideoConvertCtx = sws_getContext(stream->codec->width,
-                stream->codec->height,
-                stream->codec->pix_fmt,
-                Output::surface_getWidth(),
-                Output::surface_getHeight(),
-                PIX_FMT_RGBA,
-                SWS_POINT,
-                NULL,
-                NULL,
-                NULL);
-    }
-    if (mVideoConvertCtx == NULL) {
-        __android_log_print(ANDROID_LOG_INFO, TAG, "mVideoConvertCtx NULL");
-        return;
-    }
-    int width,height, stride;
-    void *pixels;
-    AVPicture pict;
-
-    Output::surface_lockPixels(&width, &height, &stride, &pixels);
-    __android_log_print(ANDROID_LOG_ERROR, "showVideo", "surface(%dx%d,strid: %d)", width,height,stride);
-    pict.data[0] = (uint8_t*)pixels;
-    pict.linesize[0] = stride*4;
-    // Convert the image from its native format to RGBA
-    sws_scale(mVideoConvertCtx,
-              frame->data,
-              frame->linesize,
-              0,
-              mVideoHeight,
-              pict.data,
-              pict.linesize);
-
-    Output::surface_unlockPixels();
-}
+//void MediaPlayer::showVideo(AVFrame* frame){
+//    if(mVideoConvertCtx == NULL){
+//        AVStream* stream = mMovieFile->streams[mVideoStreamIndex];
+//        mVideoConvertCtx = sws_getContext(stream->codec->width,
+//                stream->codec->height,
+//                stream->codec->pix_fmt,
+//                Output::surface_getWidth(),
+//                Output::surface_getHeight(),
+//                PIX_FMT_RGBA,
+//                SWS_POINT,
+//                NULL,
+//                NULL,
+//                NULL);
+//    }
+//    if (mVideoConvertCtx == NULL) {
+//        __android_log_print(ANDROID_LOG_INFO, TAG, "mVideoConvertCtx NULL");
+//        return;
+//    }
+//    int width,height, stride;
+//    void *pixels;
+//    AVPicture pict;
+//
+//    Output::surface_lockPixels(&width, &height, &stride, &pixels);
+//    __android_log_print(ANDROID_LOG_ERROR, "showVideo", "surface(%dx%d,strid: %d)", width,height,stride);
+//    pict.data[0] = (uint8_t*)pixels;
+//    pict.linesize[0] = stride*4;
+//    // Convert the image from its native format to RGBA
+//    sws_scale(mVideoConvertCtx,
+//              frame->data,
+//              frame->linesize,
+//              0,
+//              mVideoHeight,
+//              pict.data,
+//              pict.linesize);
+//
+//    Output::surface_unlockPixels();
+//}
 
 //void MediaPlayer::decodeAudioCB(AVFrame* frame, void* userdata){
 //    MediaPlayer *player = (MediaPlayer*)userdata;
@@ -462,9 +462,9 @@ void MediaPlayer::showVideo(AVFrame* frame){
 //	}*/
 //}
 
-void MediaPlayer::decodeAudio2CB(void* userdata){
+void MediaPlayer::audioFrameCB(void* userdata){
     MediaPlayer *player = (MediaPlayer*)userdata;
-    player->playAudio2();
+    player->decodeAudioFrame();
 
     if(FPS_DEBUGGING) {
         timeval pTime;
@@ -483,7 +483,7 @@ void MediaPlayer::decodeAudio2CB(void* userdata){
         frames++;
     }
 }
-void MediaPlayer::playAudio2(){
+void MediaPlayer::decodeAudioFrame(){
     int got_frame = 0;
     int data_size = 0;
     if(!mAudioTrack){
@@ -579,7 +579,7 @@ void MediaPlayer::decodeMovie(void* ptr)
     if(mAudioStreamIndex) {
         AVStream* stream_audio = mMovieFile->streams[mAudioStreamIndex];
         mAudioTrack = new SLESAudioTrack(44100, SL_PCMSAMPLEFORMAT_FIXED_16, stream_audio->codec->channels);
-        mAudioTrack->setAudioCallback(decodeAudio2CB, this);
+        mAudioTrack->setAudioCallback(audioFrameCB, this);
         mAudioFrame = av_frame_alloc();
         mAudioQueue = new PacketQueue();
 
@@ -587,9 +587,6 @@ void MediaPlayer::decodeMovie(void* ptr)
         char tmp[8];
         mAudioTrack->write(tmp, 0, 8);
     }
-//    Output::createAudioEngine();
-//    Output::setAudioCallback(decodeAudio2CB, this);
-//    Output::createBufferQueueAudioPlayer(44100, stream_audio->codec->channels, SL_PCMSAMPLEFORMAT_FIXED_16);
 
     mVideoFrame = av_frame_alloc();
     mVideoQueue = new PacketQueue();
