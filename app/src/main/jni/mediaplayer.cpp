@@ -14,6 +14,9 @@
 #include <stdio.h>
 #include <fcntl.h>
 
+#include "gles/include/SelfDef.h"
+#include "gles/include/GLYUV420PRender.h"
+
 extern "C" {
 	
 #include "libavcodec/avcodec.h"
@@ -21,6 +24,7 @@ extern "C" {
 #include "libswscale/swscale.h"
 #include "libswresample/swresample.h"
 #include "libavutil/log.h"
+#include "libavutil/pixdesc.h"
 	
 } // end of extern C
 
@@ -37,51 +41,40 @@ extern "C" {
 
 //#define DUM_A
 
-MediaPlayer::MediaPlayer()
-{
-    mListener = NULL;
-    mCookie = NULL;
-    mDuration = -1;
-/*    mStreamType = MUSIC;*/
-    mCurrentPosition = -1;
-    mSeekPosition = -1;
-    mCurrentState = MEDIA_PLAYER_IDLE;
-    mPrepareSync = false;
-    mPrepareStatus = NO_ERROR;
-    mLoop = false;
-    pthread_mutex_init(&mLock, NULL);
-    mLeftVolume = mRightVolume = 1.0;
-    mVideoWidth = mVideoHeight = 0;
-    mMovieFile = NULL;
-    mVideoConvertCtx = NULL;
-    mAudioSwrCtx = NULL;
-    mDecoderAudio = NULL;
-    mVideoStreamIndex = -1;
-    mAudioStreamIndex = -1;
-    mRawAudioBuf = NULL;
-    mAudioQueue = NULL;
-    mAudioFrame = NULL;
-    mVideoQueue = NULL;
-    mVideoFrame = NULL;
-    mAudioTrack = NULL;
-
+MediaPlayer::MediaPlayer():mListener(NULL),mCookie(NULL),
+                           mDuration(-1),mRender(NULL),mCurrentPosition(-1),
+                           mSeekPosition(-1),mCurrentState(MEDIA_PLAYER_IDLE),
+                           mPrepareSync(false),mPrepareStatus(NO_ERROR),
+                           mLoop(false),mLeftVolume(1.0),mRightVolume(1.0),
+                           mVideoWidth(0),mVideoHeight(0),mAVFormatCtx(NULL),
+                           mVideoConvertCtx(NULL),mAudioSwrCtx(NULL),mDecoderAudio(NULL),
+                           mVideoStreamIndex(-1),mAudioStreamIndex(-1),mRawAudioBuf(NULL),
+                           mAudioQueue(NULL),mVideoQueue(NULL),mAudioFrame(NULL),
+                           mVideoFrame(NULL),mAudioTrack(NULL){
     av_register_all();
+//    mRender = new GLYUV420PRender;
 }
 
-MediaPlayer::~MediaPlayer()
-{
-	if(mListener != NULL) {
-		free(mListener);
-	}
+MediaPlayer::~MediaPlayer() {
+    deleteC(mRender);
+//	if(mListener != NULL) {
+//		free(mListener);
+//	}
 }
 
+void MediaPlayer::onSurfaceCreated(){
+
+}
+void MediaPlayer::onSurfaceChanged(int width, int height){
+    mRender->createGLProgram(YUV420P_VS, YUV420P_FS);
+}
 status_t MediaPlayer::prepareAudio()
 {
 	__android_log_print(ANDROID_LOG_INFO, TAG, "prepareAudio");
 	mAudioStreamIndex = -1;
 	AVDictionary *optionsDict = NULL;
-	for (int i = 0; i < mMovieFile->nb_streams; i++) {
-		if (mMovieFile->streams[i]->codec->codec_type == AVMEDIA_TYPE_AUDIO) {
+	for (int i = 0; i < mAVFormatCtx->nb_streams; i++) {
+		if (mAVFormatCtx->streams[i]->codec->codec_type == AVMEDIA_TYPE_AUDIO) {
 			mAudioStreamIndex = i;
 			break;
 		}
@@ -91,7 +84,7 @@ status_t MediaPlayer::prepareAudio()
 		return INVALID_OPERATION;
 	}
 
-	AVStream* stream = mMovieFile->streams[mAudioStreamIndex];
+	AVStream* stream = mAVFormatCtx->streams[mAudioStreamIndex];
 	// Get a pointer to the codec context for the video stream
 	AVCodecContext* codec_ctx = stream->codec;
 	AVCodec* codec = avcodec_find_decoder(codec_ctx->codec_id);
@@ -103,20 +96,6 @@ status_t MediaPlayer::prepareAudio()
 	if (avcodec_open2(codec_ctx, codec, &optionsDict) < 0) {
 		return INVALID_OPERATION;
 	}
-
-	// prepare os output
-/*	if (Output::AudioDriver_set(MUSIC,
-								stream->codec->sample_rate,
-								PCM_16_BIT,
-								(stream->codec->channels == 2) ? CHANNEL_OUT_STEREO
-										: CHANNEL_OUT_MONO) != ANDROID_AUDIOTRACK_RESULT_SUCCESS) {
-		return INVALID_OPERATION;
-	}
-
-	if (Output::AudioDriver_start() != ANDROID_AUDIOTRACK_RESULT_SUCCESS) {
-		return INVALID_OPERATION;
-	}*/
-
 	return NO_ERROR;
 }
 
@@ -126,8 +105,8 @@ status_t MediaPlayer::prepareVideo()
 	// Find the first video stream
 	mVideoStreamIndex = -1;
 	AVDictionary *optionsDict = NULL;
-	for (int i = 0; i < mMovieFile->nb_streams; i++) {
-		if (mMovieFile->streams[i]->codec->codec_type == AVMEDIA_TYPE_VIDEO) {
+	for (int i = 0; i < mAVFormatCtx->nb_streams; i++) {
+		if (mAVFormatCtx->streams[i]->codec->codec_type == AVMEDIA_TYPE_VIDEO) {
 			mVideoStreamIndex = i;
 			__android_log_print(ANDROID_LOG_INFO, TAG, "prepareVideo,index: %d",mVideoStreamIndex);
 			break;
@@ -138,7 +117,7 @@ status_t MediaPlayer::prepareVideo()
 		return INVALID_OPERATION;
 	}
 	
-	AVStream* stream = mMovieFile->streams[mVideoStreamIndex];
+	AVStream* stream = mAVFormatCtx->streams[mVideoStreamIndex];
 	// Get a pointer to the codec context for the video stream
 	AVCodecContext* codec_ctx = stream->codec;
 	AVCodec* codec = avcodec_find_decoder(codec_ctx->codec_id);
@@ -153,18 +132,22 @@ status_t MediaPlayer::prepareVideo()
 	    __android_log_print(ANDROID_LOG_INFO, TAG, "prepareVideo open fail");
 		return INVALID_OPERATION;
 	}
-	
+    /*
+     *mult thread decode video
+     */
+    codec_ctx->active_thread_type |= FF_THREAD_FRAME;
+    codec->capabilities |= CODEC_CAP_DELAY;
+
 	mVideoWidth = codec_ctx->width;
 	mVideoHeight = codec_ctx->height;
-	mDuration =  mMovieFile->duration;
+	mDuration =  mAVFormatCtx->duration;
 	
 	__android_log_print(ANDROID_LOG_INFO, TAG, "prepareVideo vSize(%dx%d)",mVideoWidth,mVideoHeight);
 
 	return NO_ERROR;
 }
 
-status_t MediaPlayer::prepare()
-{
+status_t MediaPlayer::prepare() {
     __android_log_print(ANDROID_LOG_INFO, TAG, "prepare");
 	status_t ret;
 	mCurrentState = MEDIA_PLAYER_PREPARING;
@@ -181,6 +164,9 @@ status_t MediaPlayer::prepare()
 	}
 	mCurrentState = MEDIA_PLAYER_PREPARED;
 	__android_log_print(ANDROID_LOG_INFO, TAG, "prepare state :%d",mCurrentState);
+    if(mListener){
+        mListener->notify((int)MEDIA_PLAYER_PREPARED, 0 , 0);
+    }
 	return NO_ERROR;
 }
 
@@ -203,19 +189,19 @@ status_t MediaPlayer::setDataSource(const char *fn)
     }
 
     // Open video file
-    if(avformat_open_input(&mMovieFile, fn, NULL, NULL)!=0){
+    if(avformat_open_input(&mAVFormatCtx, fn, NULL, NULL)!=0){
         __android_log_print(ANDROID_LOG_ERROR, TAG, "Unable to open input %s", fn);
       return INVALID_OPERATION;  // Couldn't open file
     }
 
     // Retrieve stream information
-    if(avformat_find_stream_info(mMovieFile, NULL)<0){
+    if(avformat_find_stream_info(mAVFormatCtx, NULL)<0){
         __android_log_print(ANDROID_LOG_ERROR, TAG, "Unable to find stream %s", fn);
       return INVALID_OPERATION; // Couldn't find stream information
     }
 
     // Dump information about file onto standard error
-    av_dump_format(mMovieFile, 0, fn, 0);
+    av_dump_format(mAVFormatCtx, 0, fn, 0);
 
 	mCurrentState = MEDIA_PLAYER_INITIALIZED;
     return NO_ERROR;
@@ -229,12 +215,20 @@ void* MediaPlayer::startPlayer(void* ptr)
 }
 status_t MediaPlayer::start()
 {
-    if (mCurrentState != MEDIA_PLAYER_PREPARED) {
+//    if (mCurrentState != MEDIA_PLAYER_PREPARED) {
+//        __android_log_print(ANDROID_LOG_ERROR, TAG, "starting player thread error state :%d",mCurrentState);
+//        return INVALID_OPERATION;
+//    }
+    status_t ret = NO_ERROR;
+    if(mCurrentState == MEDIA_PLAYER_PAUSED){
+
+    }else if(mCurrentState == MEDIA_PLAYER_PREPARED){
+        pthread_create(&mPlayerThread, NULL, startPlayer, this);
+    }else{
+        status_t ret = INVALID_OPERATION;
         __android_log_print(ANDROID_LOG_ERROR, TAG, "starting player thread error state :%d",mCurrentState);
-        return INVALID_OPERATION;
     }
-    pthread_create(&mPlayerThread, NULL, startPlayer, this);
-    return NO_ERROR;
+    return ret;
 }
 
 status_t MediaPlayer::suspend() {
@@ -261,13 +255,7 @@ status_t MediaPlayer::suspend() {
     }
 	
 	// Close the video file
-    avformat_close_input(&mMovieFile);
-
-	//close OS drivers
-	/*Output::AudioDriver_unregister();*/
-//	Output::surface_unregister();
-
-	__android_log_print(ANDROID_LOG_ERROR, TAG, "suspended");
+    avformat_close_input(&mAVFormatCtx);
 
     return NO_ERROR;
 }
@@ -278,14 +266,6 @@ status_t MediaPlayer::suspend() {
 	//pthread_mutex_unlock(&mLock);
     return NO_ERROR;
 }*/
-
-//status_t MediaPlayer::setVideoSurface(JNIEnv* env, jobject jsurface)
-//{
-//	if(Output::surface_register(env, jsurface) != NO_ERROR) {
-//		return INVALID_OPERATION;
-//	}
-//    return NO_ERROR;
-//}
 
 bool MediaPlayer::shouldCancel(PacketQueue* queue)
 {
@@ -317,24 +297,11 @@ void MediaPlayer::renderVideoCB(Image *pImg, void *userData){
 }
 
 void MediaPlayer::renderVideo(Image *pImg){
-    AVPicture pict;
     AVStream* stream = NULL;
     int pts = 0;
     int got_frame = 0;
     if(mVideoQueue && pImg){
-        stream = mMovieFile->streams[mVideoStreamIndex];
-        if(mVideoConvertCtx == NULL){
-            mVideoConvertCtx = sws_getContext(stream->codec->width,
-                    stream->codec->height,
-                    stream->codec->pix_fmt,
-                    pImg->width,
-                    pImg->height,
-                    AV_PIX_FMT_YUV420P,
-                    SWS_POINT,
-                    NULL,
-                    NULL,
-                    NULL);
-        }
+        stream = mAVFormatCtx->streams[mVideoStreamIndex];
         if(mVideoQueue->get(&mVideoPacket, true) < 0){
             return;
         }
@@ -343,23 +310,17 @@ void MediaPlayer::renderVideo(Image *pImg){
         avcodec_decode_video2(stream->codec, mVideoFrame, &got_frame, &mVideoPacket);
         gettimeofday(&t1, NULL);
         LOGE("decodev2 mydt==%ld",(1000000 * (t1.tv_sec - t0.tv_sec) + t1.tv_usec - t0.tv_usec)/1000);
+
         if (got_frame) {
-            pict.data[0] = (uint8_t*)(pImg->plane[0]);
-            pict.data[1] = (uint8_t*)(pImg->plane[1]);
-            pict.data[2] = (uint8_t*)(pImg->plane[2]);
-            pict.linesize[0] = pImg->pitch[0];
-            pict.linesize[1] = pImg->pitch[1];
-            pict.linesize[2] = pImg->pitch[2];
             gettimeofday(&t0, NULL);
-            sws_scale(mVideoConvertCtx,
-                      mVideoFrame->data,
-                      mVideoFrame->linesize,
-                      0,
-                      stream->codec->height,
-                      pict.data,
-                      pict.linesize);
+            LOGE("decodev2 videoFmt: %s",av_get_pix_fmt_name(stream->codec->pix_fmt));
+            LOGE("decodev2 ImgSize: %d x %d",pImg->width, pImg->height);
+            LOGE("decodev2 VideoSize: %d x %d",mVideoFrame->width, mVideoFrame->height);
+            LOGE("decodev2 linesize:0-%d ,1-%d, 2-%d",mVideoFrame->linesize[0],
+                 mVideoFrame->linesize[1],  mVideoFrame->linesize[2]);
+            fillYUV420PImage(pImg, mVideoFrame->data, mVideoFrame->linesize, pImg->width, pImg->height);
             gettimeofday(&t1, NULL);
-            LOGE("swsScale mydt==%ld",(1000000 * (t1.tv_sec - t0.tv_sec) + t1.tv_usec - t0.tv_usec)/1000);
+            LOGE("fill420PImage mydt==%ld",(1000000 * (t1.tv_sec - t0.tv_sec) + t1.tv_usec - t0.tv_usec)/1000);
 #ifdef DUM_A
             static int idx = 0;
             if(idx<10){
@@ -374,33 +335,10 @@ void MediaPlayer::renderVideo(Image *pImg){
         av_free_packet(&mVideoPacket);
     }
 }
-//void MediaPlayer::decodeVideoCB(AVFrame* frame, double pts, void* userdata){
-//    MediaPlayer *player = (MediaPlayer *)userdata;
-//    player->showVideo(frame);
-//
-//	if(FPS_DEBUGGING) {
-//		timeval pTime;
-//		static int frames = 0;
-//		static double t1 = -1;
-//		static double t2 = -1;
-//
-//		gettimeofday(&pTime, NULL);
-//		t2 = pTime.tv_sec + (pTime.tv_usec / 1000000.0);
-//		if (t1 == -1 || t2 > t1 + 1) {
-//			__android_log_print(ANDROID_LOG_INFO, "fffps", "Video fps:%i", frames);
-//			//sPlayer->notify(MEDIA_INFO_FRAMERATE_VIDEO, frames, -1);
-//			t1 = t2;
-//			frames = 0;
-//		}
-//		frames++;
-//	}
-//
-//	/*Output::VideoDriver_updateSurface();*/
-//}
 
 //void MediaPlayer::showVideo(AVFrame* frame){
 //    if(mVideoConvertCtx == NULL){
-//        AVStream* stream = mMovieFile->streams[mVideoStreamIndex];
+//        AVStream* stream = mAVFormatCtx->streams[mVideoStreamIndex];
 //        mVideoConvertCtx = sws_getContext(stream->codec->width,
 //                stream->codec->height,
 //                stream->codec->pix_fmt,
@@ -489,7 +427,7 @@ void MediaPlayer::decodeAudioFrame(){
     if(!mAudioTrack){
         return;
     }
-    AVStream* stream = mMovieFile->streams[mAudioStreamIndex];
+    AVStream* stream = mAVFormatCtx->streams[mAudioStreamIndex];
     AVCodecContext* codec_ctx = stream->codec;
     if(mAudioSwrCtx==NULL){
         mAudioSwrCtx = swr_alloc_set_opts(NULL,
@@ -528,56 +466,17 @@ void MediaPlayer::decodeAudioFrame(){
     av_free_packet(&mAudioPacket);
 }
 
-//void MediaPlayer::playAudio(AVFrame* frame){
-//    AVStream* stream = mMovieFile->streams[mAudioStreamIndex];
-//    AVCodecContext* codec_ctx = stream->codec;
-//    if(mAudioSwrCtx==NULL){
-//        mAudioSwrCtx = swr_alloc_set_opts(NULL,
-//            codec_ctx->channel_layout, AV_SAMPLE_FMT_S16, 44100,
-//
-//            codec_ctx->channel_layout,
-//            codec_ctx->sample_fmt ,
-//            codec_ctx->sample_rate,
-//            0, NULL);
-//        swr_init(mAudioSwrCtx);
-//    }
-//    if(mAudioSwrCtx==NULL){
-//        Output::shutdownAudio();
-//        return;
-//    }
-//    int data_size = av_samples_get_buffer_size(NULL,
-//            codec_ctx->channels,
-//            frame->nb_samples,
-//            AV_SAMPLE_FMT_S16, 0);
-//     if (data_size > 0) {
-//         if(mRawAudioBuf==NULL){
-//             mRawAudioBuf = new uint8_t[data_size];
-//         }
-//         swr_convert(mAudioSwrCtx,
-//                 &mRawAudioBuf, frame->nb_samples,
-//                 (const uint8_t**)frame->data, frame->nb_samples);
-//         Output::writeAudioBuf(mRawAudioBuf, data_size);
-//#ifdef DUM_A
-//         const char *sampfmt = av_get_sample_fmt_name(AV_SAMPLE_FMT_S16);
-//         char fn[256]={0,};
-//         sprintf(fn,"/sdcard/DCIM/my_rate%d_ch%d_%s.pcm",44100,
-//                 codec_ctx->channels,sampfmt);
-//         adump2File(mRawAudioBuf, data_size, fn);
-//#endif//DUM_A
-//     }
-//}
-
 void MediaPlayer::decodeMovie(void* ptr)
 {
 	AVPacket pPacket;
 	
-//	AVStream* stream_audio = mMovieFile->streams[mAudioStreamIndex];
+//	AVStream* stream_audio = mAVFormatCtx->streams[mAudioStreamIndex];
 //	mDecoderAudio = new DecoderAudio(stream_audio);
 //	mDecoderAudio->onDecode = decodeAudioCB;
 //	mDecoderAudio->userData=this;
 //	mDecoderAudio->startAsync();
     if(mAudioStreamIndex) {
-        AVStream* stream_audio = mMovieFile->streams[mAudioStreamIndex];
+        AVStream* stream_audio = mAVFormatCtx->streams[mAudioStreamIndex];
         mAudioTrack = new SLESAudioTrack(44100, SL_PCMSAMPLEFORMAT_FIXED_16, stream_audio->codec->channels);
         mAudioTrack->setAudioCallback(audioFrameCB, this);
         mAudioFrame = av_frame_alloc();
@@ -591,7 +490,7 @@ void MediaPlayer::decodeMovie(void* ptr)
     mVideoFrame = av_frame_alloc();
     mVideoQueue = new PacketQueue();
 	
-//	AVStream* stream_video = mMovieFile->streams[mVideoStreamIndex];
+//	AVStream* stream_video = mAVFormatCtx->streams[mVideoStreamIndex];
 //	mDecoderVideo = new DecoderVideo(stream_video);
 //	mDecoderVideo->onDecode = decodeVideoCB;
 //	mDecoderVideo->userData = this;
@@ -607,7 +506,7 @@ void MediaPlayer::decodeMovie(void* ptr)
 //			continue;
 //		}
 		
-		if(av_read_frame(mMovieFile, &pPacket) < 0) {
+		if(av_read_frame(mAVFormatCtx, &pPacket) < 0) {
 //			mCurrentState = MEDIA_PLAYER_DECODED;
 			continue;
 		}

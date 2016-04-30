@@ -15,6 +15,7 @@ JNIEXPORT void JNICALL Java_com_angzangy_jni_GLVideoJni_init
     deleteC(p420Render);
     pPlayer = new MediaPlayer;
     p420Render = new GLYUV420PRender();
+    pPlayer->mRender = p420Render;
 }
 
 
@@ -24,9 +25,9 @@ JNIEXPORT void JNICALL Java_com_angzangy_jni_GLVideoJni_surfaceCreated
 
 JNIEXPORT void JNICALL Java_com_angzangy_jni_GLVideoJni_surfaceChanged
   (JNIEnv *env, jclass clazz, jint jsurfaceWidth, jint jsurfaceHeight){
+    jsurfaceWidth = 1280;
+    jsurfaceHeight = 720;
     if(p420Render && pPlayer){
-        jsurfaceWidth = 1280;
-        jsurfaceHeight = 720;
         p420Render->allocBuf(0, jsurfaceWidth, jsurfaceHeight);
         p420Render->createGLProgram(YUV420P_VS, YUV420P_FS);
         Image *img = p420Render->getImagePtr();
@@ -37,9 +38,6 @@ JNIEXPORT void JNICALL Java_com_angzangy_jni_GLVideoJni_surfaceChanged
         p420Render->setRenderDataCB(MediaPlayer::renderVideoCB, pPlayer);
 
         __android_log_print(ANDROID_LOG_INFO, "surfaceChanged", "myimgJni size: %dx%d",img->width,img->height);
-        for(int i=0;i<3;i++){
-            __android_log_print(ANDROID_LOG_INFO, "surfaceChanged", "myimgJni pitch[%d]: %d",i,img->pitch[i]);
-        }
     }
 }
 

@@ -1,4 +1,5 @@
 #include "SLESAudioTrack.h"
+#include "jnilogger.h"
 
 SLuint32 SLESAudioTrack::convertSLESSamplerate(int samplerate){
     switch(samplerate) {

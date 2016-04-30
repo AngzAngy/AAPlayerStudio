@@ -9,6 +9,7 @@
 #include "decoder_audio.h"
 #include "decoder_video.h"
 #include "gles/include/Image.h"
+#include "gles/include/GLRender.h"
 #include "AudioTrack.h"
 
 #define FFMPEG_PLAYER_MAX_QUEUE_SIZE 10
@@ -124,7 +125,6 @@ public:
     MediaPlayer();
     ~MediaPlayer();
 	status_t        setDataSource(const char *url);
-//	status_t        setVideoSurface(JNIEnv* env, jobject jsurface);
 	status_t        setListener(MediaPlayerListener *listener);
 	status_t        start();
 	status_t        stop();
@@ -139,39 +139,31 @@ public:
 	status_t        setAudioStreamType(int type);
 	status_t		prepare();
 	void            notify(int msg, int ext1, int ext2);
-//    static  sp<IMemory>     decode(const char* url, uint32_t *pSampleRate, int* pNumChannels, int* pFormat);
-//    static  sp<IMemory>     decode(int fd, int64_t offset, int64_t length, uint32_t *pSampleRate, int* pNumChannels, int* pFormat);
-//    static  int             snoop(short *data, int len, int kind);
-//            status_t        invoke(const Parcel& request, Parcel *reply);
-//            status_t        setMetadataFilter(const Parcel& filter);
-//            status_t        getMetadata(bool update_only, bool apply_filter, Parcel *metadata);
 	status_t        suspend();
-//	status_t        resume();
 
+    void onSurfaceCreated();
+    void onSurfaceChanged(int width, int height);
+
+    GLRender *mRender;
 private:
-	static void					ffmpegNotify(void* ptr, int level, const char* fmt, va_list vl);
+	static void				ffmpegNotify(void* ptr, int level, const char* fmt, va_list vl);
 	static void*				startPlayer(void* ptr);
 
 	static void 				decodeVideoCB(AVFrame* frame, double pts, void* userdata);
-//	static void 				decodeAudioCB(AVFrame* frame, void* userdata);
-	static void                 audioFrameCB(void* userdata);
+	static void                audioFrameCB(void* userdata);
 
 	status_t					prepareAudio();
 	status_t					prepareVideo();
 	bool						shouldCancel(PacketQueue* queue);
 	void						decodeMovie(void* ptr);
-//	void                        showVideo(AVFrame* frame);
 	void                        renderVideo(Image *pImg);
-//	void                        playAudio(AVFrame* frame);
 	void                        decodeAudioFrame();
 	
 	double 						mTime;
-	pthread_mutex_t             mLock;
+	pthread_mutex_t             mCurrentStateLock;
 	pthread_t					mPlayerThread;
-    //Mutex                       mNotifyLock;
-    //Condition                   mSignal;
     MediaPlayerListener*		mListener;
-    AVFormatContext*			mMovieFile;
+    AVFormatContext*			mAVFormatCtx;
     int 						mAudioStreamIndex;
     int 						mVideoStreamIndex;
     PacketQueue*                mVideoQueue;
