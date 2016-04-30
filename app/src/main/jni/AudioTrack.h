@@ -12,7 +12,7 @@ public:
     virtual void start();
     virtual void pause();
     virtual void stop();
-    virtual int32_t write(void *buf, int32_t offset, int32_t length) = 0;
+    virtual int32_t write(void *buf, int32_t sizeInBytes) = 0;
     void setAudioCallback(AudioCB audioCB, void *userData);
 
 protected:

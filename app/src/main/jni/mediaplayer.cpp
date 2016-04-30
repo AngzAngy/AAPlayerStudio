@@ -32,7 +32,6 @@ extern "C" {
 
 #include "mediaplayer.h"
 #include "SLESAudioTrack.h"
-//#include "output.h"
 #include "jnilogger.h"
 #include "image-util.h"
 #include "SelfDef.h"
@@ -52,14 +51,10 @@ MediaPlayer::MediaPlayer():mListener(NULL),mCookie(NULL),
                            mAudioQueue(NULL),mVideoQueue(NULL),mAudioFrame(NULL),
                            mVideoFrame(NULL),mAudioTrack(NULL){
     av_register_all();
-//    mRender = new GLYUV420PRender;
 }
 
 MediaPlayer::~MediaPlayer() {
     deleteC(mRender);
-//	if(mListener != NULL) {
-//		free(mListener);
-//	}
 }
 
 void MediaPlayer::onSurfaceCreated(){
@@ -70,7 +65,7 @@ void MediaPlayer::onSurfaceChanged(int width, int height){
 }
 status_t MediaPlayer::prepareAudio()
 {
-	__android_log_print(ANDROID_LOG_INFO, TAG, "prepareAudio");
+	LOGI("prepareAudio");
 	mAudioStreamIndex = -1;
 	AVDictionary *optionsDict = NULL;
 	for (int i = 0; i < mAVFormatCtx->nb_streams; i++) {
@@ -101,14 +96,14 @@ status_t MediaPlayer::prepareAudio()
 
 status_t MediaPlayer::prepareVideo()
 {
-	__android_log_print(ANDROID_LOG_INFO, TAG, "prepareVideo");
+	LOGI("prepareVideo");
 	// Find the first video stream
 	mVideoStreamIndex = -1;
 	AVDictionary *optionsDict = NULL;
 	for (int i = 0; i < mAVFormatCtx->nb_streams; i++) {
 		if (mAVFormatCtx->streams[i]->codec->codec_type == AVMEDIA_TYPE_VIDEO) {
 			mVideoStreamIndex = i;
-			__android_log_print(ANDROID_LOG_INFO, TAG, "prepareVideo,index: %d",mVideoStreamIndex);
+			LOGI("prepareVideo,index: %d",mVideoStreamIndex);
 			break;
 		}
 	}
@@ -121,15 +116,14 @@ status_t MediaPlayer::prepareVideo()
 	// Get a pointer to the codec context for the video stream
 	AVCodecContext* codec_ctx = stream->codec;
 	AVCodec* codec = avcodec_find_decoder(codec_ctx->codec_id);
-	__android_log_print(ANDROID_LOG_INFO, TAG, "prepareVideo finddecoder");
 	if (codec == NULL) {
-	    __android_log_print(ANDROID_LOG_ERROR, TAG, "prepareVideo finddecoder fail");
+	   LOGE("prepareVideo finddecoder fail");
 		return INVALID_OPERATION;
 	}
 	
 	// Open codec
 	if (avcodec_open2(codec_ctx, codec, &optionsDict) < 0) {
-	    __android_log_print(ANDROID_LOG_INFO, TAG, "prepareVideo open fail");
+	    LOGE("prepareVideo open fail");
 		return INVALID_OPERATION;
 	}
     /*
@@ -142,28 +136,25 @@ status_t MediaPlayer::prepareVideo()
 	mVideoHeight = codec_ctx->height;
 	mDuration =  mAVFormatCtx->duration;
 	
-	__android_log_print(ANDROID_LOG_INFO, TAG, "prepareVideo vSize(%dx%d)",mVideoWidth,mVideoHeight);
+	LOGI("prepareVideo vSize(%dx%d)",mVideoWidth,mVideoHeight);
 
 	return NO_ERROR;
 }
 
 status_t MediaPlayer::prepare() {
-    __android_log_print(ANDROID_LOG_INFO, TAG, "prepare");
+    LOGI("prepare");
 	status_t ret;
 	mCurrentState = MEDIA_PLAYER_PREPARING;
 	av_log_set_callback(ffmpegNotify);
 	if ((ret = prepareVideo()) != NO_ERROR) {
 		mCurrentState = MEDIA_PLAYER_STATE_ERROR;
-		__android_log_print(ANDROID_LOG_INFO, TAG, "prepareVideo error");
 		return ret;
 	}
 	if ((ret = prepareAudio()) != NO_ERROR) {
 		mCurrentState = MEDIA_PLAYER_STATE_ERROR;
-		__android_log_print(ANDROID_LOG_INFO, TAG, "prepareAudio error");
 		return ret;
 	}
 	mCurrentState = MEDIA_PLAYER_PREPARED;
-	__android_log_print(ANDROID_LOG_INFO, TAG, "prepare state :%d",mCurrentState);
     if(mListener){
         mListener->notify((int)MEDIA_PLAYER_PREPARED, 0 , 0);
     }
@@ -172,31 +163,31 @@ status_t MediaPlayer::prepare() {
 
 status_t MediaPlayer::setListener(MediaPlayerListener* listener)
 {
-    __android_log_print(ANDROID_LOG_INFO, TAG, "setListener");
+    LOGI("setListener");
     mListener = listener;
     return NO_ERROR;
 }
 
 status_t MediaPlayer::setDataSource(const char *fn)
 {
-    __android_log_print(ANDROID_LOG_ERROR, TAG, "setDataSource ==%s", fn);
+    LOGI("setDataSource == %s", fn);
 
     status_t err = BAD_VALUE;
     AVIOContext  *io_context=NULL;
     if (avio_open(&io_context, fn, 0)<0){
-        __android_log_print(ANDROID_LOG_ERROR, TAG, "Unable to open I/O %s", fn);
+        LOGE("Unable to open I/O %s", fn);
       return INVALID_OPERATION;
     }
 
     // Open video file
     if(avformat_open_input(&mAVFormatCtx, fn, NULL, NULL)!=0){
-        __android_log_print(ANDROID_LOG_ERROR, TAG, "Unable to open input %s", fn);
+        LOGE("Unable to open input %s", fn);
       return INVALID_OPERATION;  // Couldn't open file
     }
 
     // Retrieve stream information
     if(avformat_find_stream_info(mAVFormatCtx, NULL)<0){
-        __android_log_print(ANDROID_LOG_ERROR, TAG, "Unable to find stream %s", fn);
+        LOGE("Unable to find stream %s", fn);
       return INVALID_OPERATION; // Couldn't find stream information
     }
 
@@ -209,9 +200,9 @@ status_t MediaPlayer::setDataSource(const char *fn)
 
 void* MediaPlayer::startPlayer(void* ptr)
 {
-    __android_log_print(ANDROID_LOG_INFO, TAG, "main player thread");
+    LOGI("main player thread");
     MediaPlayer *pPlayer = (MediaPlayer*)ptr;
-    pPlayer->decodeMovie(ptr);
+    pPlayer->doDecode(ptr);
 }
 status_t MediaPlayer::start()
 {
@@ -226,13 +217,13 @@ status_t MediaPlayer::start()
         pthread_create(&mPlayerThread, NULL, startPlayer, this);
     }else{
         status_t ret = INVALID_OPERATION;
-        __android_log_print(ANDROID_LOG_ERROR, TAG, "starting player thread error state :%d",mCurrentState);
+        LOGE("starting player thread error state :%d",mCurrentState);
     }
     return ret;
 }
 
 status_t MediaPlayer::suspend() {
-	__android_log_print(ANDROID_LOG_INFO, TAG, "suspend");
+    LOGI("suspend");
 	
 	mCurrentState = MEDIA_PLAYER_STOPPED;
 	if(mDecoderAudio != NULL) {
@@ -243,7 +234,7 @@ status_t MediaPlayer::suspend() {
 	}
 	
 	if(pthread_join(mPlayerThread, NULL) != 0) {
-		__android_log_print(ANDROID_LOG_ERROR, TAG, "Couldn't cancel player thread");
+		LOGE("Couldn't cancel player thread");
 	}
 	
 	// Close the codec
@@ -259,13 +250,6 @@ status_t MediaPlayer::suspend() {
 
     return NO_ERROR;
 }
-
-/*status_t MediaPlayer::resume() {
-	//pthread_mutex_lock(&mLock);
-	mCurrentState = MEDIA_PLAYER_STARTED;
-	//pthread_mutex_unlock(&mLock);
-    return NO_ERROR;
-}*/
 
 bool MediaPlayer::shouldCancel(PacketQueue* queue)
 {
@@ -287,8 +271,7 @@ void MediaPlayer::renderVideoCB(Image *pImg, void *userData){
           gettimeofday(&pTime, NULL);
           t2 = pTime.tv_sec + (pTime.tv_usec / 1000000.0);
           if (t1 == -1 || t2 > t1 + 1) {
-              __android_log_print(ANDROID_LOG_INFO, "fffps", "Video fps:%i", frames);
-              //sPlayer->notify(MEDIA_INFO_FRAMERATE_VIDEO, frames, -1);
+              LOGI("Video fps:%i", frames);
               t1 = t2;
               frames = 0;
           }
@@ -305,22 +288,22 @@ void MediaPlayer::renderVideo(Image *pImg){
         if(mVideoQueue->get(&mVideoPacket, true) < 0){
             return;
         }
-        timeval t0,t1;
-        gettimeofday(&t0, NULL);
+        //timeval t0,t1;
+        //gettimeofday(&t0, NULL);
         avcodec_decode_video2(stream->codec, mVideoFrame, &got_frame, &mVideoPacket);
-        gettimeofday(&t1, NULL);
-        LOGE("decodev2 mydt==%ld",(1000000 * (t1.tv_sec - t0.tv_sec) + t1.tv_usec - t0.tv_usec)/1000);
+        //gettimeofday(&t1, NULL);
+        //LOGE("decodev2 mydt==%ld",(1000000 * (t1.tv_sec - t0.tv_sec) + t1.tv_usec - t0.tv_usec)/1000);
 
         if (got_frame) {
-            gettimeofday(&t0, NULL);
+            /*gettimeofday(&t0, NULL);
             LOGE("decodev2 videoFmt: %s",av_get_pix_fmt_name(stream->codec->pix_fmt));
             LOGE("decodev2 ImgSize: %d x %d",pImg->width, pImg->height);
             LOGE("decodev2 VideoSize: %d x %d",mVideoFrame->width, mVideoFrame->height);
             LOGE("decodev2 linesize:0-%d ,1-%d, 2-%d",mVideoFrame->linesize[0],
-                 mVideoFrame->linesize[1],  mVideoFrame->linesize[2]);
+                 mVideoFrame->linesize[1],  mVideoFrame->linesize[2]);*/
             fillYUV420PImage(pImg, mVideoFrame->data, mVideoFrame->linesize, pImg->width, pImg->height);
-            gettimeofday(&t1, NULL);
-            LOGE("fill420PImage mydt==%ld",(1000000 * (t1.tv_sec - t0.tv_sec) + t1.tv_usec - t0.tv_usec)/1000);
+            //gettimeofday(&t1, NULL);
+            //LOGE("fill420PImage mydt==%ld",(1000000 * (t1.tv_sec - t0.tv_sec) + t1.tv_usec - t0.tv_usec)/1000);
 #ifdef DUM_A
             static int idx = 0;
             if(idx<10){
@@ -336,70 +319,6 @@ void MediaPlayer::renderVideo(Image *pImg){
     }
 }
 
-//void MediaPlayer::showVideo(AVFrame* frame){
-//    if(mVideoConvertCtx == NULL){
-//        AVStream* stream = mAVFormatCtx->streams[mVideoStreamIndex];
-//        mVideoConvertCtx = sws_getContext(stream->codec->width,
-//                stream->codec->height,
-//                stream->codec->pix_fmt,
-//                Output::surface_getWidth(),
-//                Output::surface_getHeight(),
-//                PIX_FMT_RGBA,
-//                SWS_POINT,
-//                NULL,
-//                NULL,
-//                NULL);
-//    }
-//    if (mVideoConvertCtx == NULL) {
-//        __android_log_print(ANDROID_LOG_INFO, TAG, "mVideoConvertCtx NULL");
-//        return;
-//    }
-//    int width,height, stride;
-//    void *pixels;
-//    AVPicture pict;
-//
-//    Output::surface_lockPixels(&width, &height, &stride, &pixels);
-//    __android_log_print(ANDROID_LOG_ERROR, "showVideo", "surface(%dx%d,strid: %d)", width,height,stride);
-//    pict.data[0] = (uint8_t*)pixels;
-//    pict.linesize[0] = stride*4;
-//    // Convert the image from its native format to RGBA
-//    sws_scale(mVideoConvertCtx,
-//              frame->data,
-//              frame->linesize,
-//              0,
-//              mVideoHeight,
-//              pict.data,
-//              pict.linesize);
-//
-//    Output::surface_unlockPixels();
-//}
-
-//void MediaPlayer::decodeAudioCB(AVFrame* frame, void* userdata){
-//    MediaPlayer *player = (MediaPlayer*)userdata;
-//    player->playAudio(frame);
-//
-//	if(FPS_DEBUGGING) {
-//		timeval pTime;
-//		static int frames = 0;
-//		static double t1 = -1;
-//		static double t2 = -1;
-//
-//		gettimeofday(&pTime, NULL);
-//		t2 = pTime.tv_sec + (pTime.tv_usec / 1000000.0);
-//		if (t1 == -1 || t2 > t1 + 1) {
-//			__android_log_print(ANDROID_LOG_INFO, "fffps", "Audio fps:%i", frames);
-//			//sPlayer->notify(MEDIA_INFO_FRAMERATE_AUDIO, frames, -1);
-//			t1 = t2;
-//			frames = 0;
-//		}
-//		frames++;
-//	}
-//
-///*	if(Output::AudioDriver_write(buffer, buffer_size) <= 0) {
-//		__android_log_print(ANDROID_LOG_ERROR, TAG, "Couldn't write samples to audio track");
-//	}*/
-//}
-
 void MediaPlayer::audioFrameCB(void* userdata){
     MediaPlayer *player = (MediaPlayer*)userdata;
     player->decodeAudioFrame();
@@ -413,8 +332,7 @@ void MediaPlayer::audioFrameCB(void* userdata){
         gettimeofday(&pTime, NULL);
         t2 = pTime.tv_sec + (pTime.tv_usec / 1000000.0);
         if (t1 == -1 || t2 > t1 + 1) {
-            __android_log_print(ANDROID_LOG_INFO, "fffps", "Audio fps:%i", frames);
-            //sPlayer->notify(MEDIA_INFO_FRAMERATE_AUDIO, frames, -1);
+            LOGI("Audio fps:%i", frames);
             t1 = t2;
             frames = 0;
         }
@@ -461,12 +379,12 @@ void MediaPlayer::decodeAudioFrame(){
                  &mRawAudioBuf, mAudioFrame->nb_samples,
                  (const uint8_t**)mAudioFrame->data, mAudioFrame->nb_samples);
 
-         mAudioTrack->write(mRawAudioBuf, 0, data_size);
+         mAudioTrack->write(mRawAudioBuf, data_size);
      }
     av_free_packet(&mAudioPacket);
 }
 
-void MediaPlayer::decodeMovie(void* ptr)
+void MediaPlayer::doDecode(void* ptr)
 {
 	AVPacket pPacket;
 	
@@ -484,7 +402,7 @@ void MediaPlayer::decodeMovie(void* ptr)
 
         mAudioTrack->start();
         char tmp[8];
-        mAudioTrack->write(tmp, 0, 8);
+        mAudioTrack->write(tmp, 8);
     }
 
     mVideoFrame = av_frame_alloc();

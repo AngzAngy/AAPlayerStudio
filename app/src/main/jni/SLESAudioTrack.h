@@ -14,7 +14,7 @@ public:
     virtual void start();
     virtual void pause();
     virtual void stop();
-    virtual int32_t write(void *buf, int32_t offset, int32_t length);
+    virtual int32_t write(void *buf, int32_t sizeInBytes);
 
 protected:
     static void bqPlayerCallback(SLAndroidSimpleBufferQueueItf bq, void *context);

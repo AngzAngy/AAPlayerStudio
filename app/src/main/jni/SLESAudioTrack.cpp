@@ -80,12 +80,11 @@ void SLESAudioTrack::stop(){
         (*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_STOPPED);
     }
 }
-int32_t SLESAudioTrack::write(void *buf, int32_t offset, int32_t length){
+int32_t SLESAudioTrack::write(void *buf, int32_t sizeInBytes){
     int8_t *buffer = ( int8_t *)buf;
-    int32_t size = length - offset;
-    if(bqPlayerBufferQueue && size > 0){
-        (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, (buffer+offset), size);
-        return size;
+    if(bqPlayerBufferQueue && buffer && sizeInBytes > 0){
+        (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, buffer, sizeInBytes);
+        return sizeInBytes;
     }else{
         return -1;
     }
