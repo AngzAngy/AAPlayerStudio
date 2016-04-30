@@ -92,10 +92,6 @@ enum AVFrameSideDataType {
      * The data is the AVDownmixInfo struct defined in libavutil/downmix_info.h.
      */
     AV_FRAME_DATA_DOWNMIX_INFO,
-    /**
-     * ReplayGain information in the form of the AVReplayGain struct.
-     */
-    AV_FRAME_DATA_REPLAYGAIN,
 };
 
 typedef struct AVFrameSideData {
@@ -174,9 +170,9 @@ typedef struct AVFrame {
      * For packed audio, there is just one data pointer, and linesize[0]
      * contains the total size of the buffer for all channels.
      *
-     * Note: Both data and  should always be set in a valid frame,
+     * Note: Both data and extended_data should always be set in a valid frame,
      * but for planar audio with more channels that can fit in data,
-     *  must be used in order to access all channels.
+     * extended_data must be used in order to access all channels.
      */
     uint8_t **extended_data;
 
@@ -283,6 +279,7 @@ typedef struct AVFrame {
      * motion_val[direction][x + y*mv_stride][0->mv_x, 1->mv_y];
      * @endcode
      */
+    attribute_deprecated
     int16_t (*motion_val[2])[2];
 
     /**
@@ -379,6 +376,7 @@ typedef struct AVFrame {
      * log2 of the size of the block which a single vector in motion_val represents:
      * (4->16x16, 3->8x8, 2-> 4x4, 1-> 2x2)
      */
+    attribute_deprecated
     uint8_t motion_subsample_log2;
 #endif
 
@@ -409,7 +407,7 @@ typedef struct AVFrame {
      * AVBufferRef pointers, this array will hold all the references which
      * cannot fit into AVFrame.buf.
      *
-     * Note that this is different from AVFrame., which always
+     * Note that this is different from AVFrame.extended_data, which always
      * contains all the pointers. This array only contains the extra pointers,
      * which cannot fit into AVFrame.buf.
      *
@@ -590,7 +588,7 @@ AVFrame *av_frame_alloc(void);
 
 /**
  * Free the frame and any dynamically allocated objects in it,
- * e.g. . If the frame is reference counted, it will be
+ * e.g. extended_data. If the frame is reference counted, it will be
  * unreferenced first.
  *
  * @param frame frame to be freed. The pointer will be set to NULL.
@@ -638,7 +636,7 @@ void av_frame_move_ref(AVFrame *dst, AVFrame *src);
  * - nb_samples and channel_layout for audio
  *
  * This function will fill AVFrame.data and AVFrame.buf arrays and, if
- * necessary, allocate and fill AVFrame. and AVFrame.extended_buf.
+ * necessary, allocate and fill AVFrame.extended_data and AVFrame.extended_buf.
  * For planar formats, one buffer will be allocated for each plane.
  *
  * @param frame frame in which to store the new buffers.
@@ -701,7 +699,7 @@ int av_frame_copy_props(AVFrame *dst, const AVFrame *src);
 /**
  * Get the buffer reference a given data plane is stored in.
  *
- * @param plane index of the data plane of interest in frame->.
+ * @param plane index of the data plane of interest in frame->extended_data.
  *
  * @return the buffer reference that contains the plane or NULL if the input
  * frame is not valid.
@@ -727,12 +725,6 @@ AVFrameSideData *av_frame_new_side_data(AVFrame *frame,
  */
 AVFrameSideData *av_frame_get_side_data(const AVFrame *frame,
                                         enum AVFrameSideDataType type);
-
-/**
- * If side data of the supplied type exists in the frame, free it and remove it
- * from the frame.
- */
-void av_frame_remove_side_data(AVFrame *frame, enum AVFrameSideDataType type);
 
 /**
  * @}

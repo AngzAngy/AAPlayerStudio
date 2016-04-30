@@ -85,11 +85,11 @@ typedef struct AVFilterBuffer {
      * For packed audio, there is just one data pointer, and linesize[0]
      * contains the total size of the buffer for all channels.
      *
-     * Note: Both data and  will always be set, but for planar
-     * audio with more channels that can fit in data,  must be used
+     * Note: Both data and extended_data will always be set, but for planar
+     * audio with more channels that can fit in data, extended_data must be used
      * in order to access all channels.
      */
-    uint8_t **;
+    uint8_t **extended_data;
     int linesize[8];            ///< number of bytes per line
 
     /** private data to be used by a custom free function */
@@ -168,11 +168,11 @@ typedef struct AVFilterBufferRef {
      * For packed audio, there is just one data pointer, and linesize[0]
      * contains the total size of the buffer for all channels.
      *
-     * Note: Both data and  will always be set, but for planar
-     * audio with more channels that can fit in data,  must be used
+     * Note: Both data and extended_data will always be set, but for planar
+     * audio with more channels that can fit in data, extended_data must be used
      * in order to access all channels.
      */
-    uint8_t **;
+    uint8_t **extended_data;
     int linesize[8];            ///< number of bytes per line
 
     AVFilterBufferRefVideoProps *video; ///< video buffer specific properties
@@ -199,7 +199,7 @@ typedef struct AVFilterBufferRef {
  * Copy properties of src to dst, without copying the actual data
  */
 attribute_deprecated
-void avfilter_copy_buffer_ref_props(AVFilterBufferRef *dst, const AVFilterBufferRef *src);
+void avfilter_copy_buffer_ref_props(AVFilterBufferRef *dst, AVFilterBufferRef *src);
 
 /**
  * Add a new reference to a buffer.
@@ -668,7 +668,7 @@ struct AVFilterContext {
      * allowed threading types. I.e. a threading type needs to be set in both
      * to be allowed.
      *
-     * After the filter is initialized, libavfilter sets this field to the
+     * After the filter is initialzed, libavfilter sets this field to the
      * threading type that is actually used (0 for no multithreading).
      */
     int thread_type;
@@ -830,7 +830,7 @@ struct AVFilterLink {
 
     /**
      * True if the link is closed.
-     * If set, all attempts of start_frame, filter_frame or request_frame
+     * If set, all attemps of start_frame, filter_frame or request_frame
      * will fail with AVERROR_EOF, and if necessary the reference will be
      * destroyed.
      * If request_frame returns AVERROR_EOF, this flag is set on the
@@ -1260,21 +1260,19 @@ AVFilterGraph *avfilter_graph_alloc(void);
  *
  * @return the context of the newly created filter instance (note that it is
  *         also retrievable directly through AVFilterGraph.filters or with
- *         avfilter_graph_get_filter()) on success or NULL on failure.
+ *         avfilter_graph_get_filter()) on success or NULL or failure.
  */
 AVFilterContext *avfilter_graph_alloc_filter(AVFilterGraph *graph,
                                              const AVFilter *filter,
                                              const char *name);
 
 /**
- * Get a filter instance identified by instance name from graph.
+ * Get a filter instance with name name from graph.
  *
- * @param graph filter graph to search through.
- * @param name filter instance name (should be unique in the graph).
  * @return the pointer to the found filter instance or NULL if it
  * cannot be found.
  */
-AVFilterContext *avfilter_graph_get_filter(AVFilterGraph *graph, const char *name);
+AVFilterContext *avfilter_graph_get_filter(AVFilterGraph *graph, char *name);
 
 #if FF_API_AVFILTER_OPEN
 /**
@@ -1386,7 +1384,7 @@ void avfilter_inout_free(AVFilterInOut **inout);
  * outputs of the already existing filters, which are provided as
  * inputs to the parsed filters.
  *
- * @param graph   the filter graph where to link the parsed graph context
+ * @param graph   the filter graph where to link the parsed grap context
  * @param filters string to be parsed
  * @param inputs  linked list to the inputs of the graph
  * @param outputs linked list to the outputs of the graph
@@ -1484,7 +1482,7 @@ int avfilter_graph_send_command(AVFilterGraph *graph, const char *target, const 
  *               "all" sends to all filters
  *               otherwise it can be a filter or filter instance name
  *               which will send the command to all matching filters.
- * @param cmd    the command to sent, for handling simplicity all commands must be alphanumeric only
+ * @param cmd    the command to sent, for handling simplicity all commands must be alphanummeric only
  * @param arg    the argument for the command
  * @param ts     time at which the command should be sent to the filter
  *
