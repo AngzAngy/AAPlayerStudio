@@ -155,7 +155,7 @@ private:
 	status_t					prepareAudio();
 	status_t					prepareVideo();
 	bool						shouldCancel(PacketQueue* queue);
-	void						doDecode(void* ptr);
+	void						demux(void* ptr);
 	void                        renderVideo(Image *pImg);
 	void                        decodeAudioFrame();
 	

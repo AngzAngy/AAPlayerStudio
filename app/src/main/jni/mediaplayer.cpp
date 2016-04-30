@@ -202,7 +202,7 @@ void* MediaPlayer::startPlayer(void* ptr)
 {
     LOGI("main player thread");
     MediaPlayer *pPlayer = (MediaPlayer*)ptr;
-    pPlayer->doDecode(ptr);
+    pPlayer->demux(ptr);
 }
 status_t MediaPlayer::start()
 {
@@ -224,7 +224,7 @@ status_t MediaPlayer::start()
 
 status_t MediaPlayer::suspend() {
     LOGI("suspend");
-	
+
 	mCurrentState = MEDIA_PLAYER_STOPPED;
 	if(mDecoderAudio != NULL) {
 		mDecoderAudio->stop();
@@ -232,11 +232,11 @@ status_t MediaPlayer::suspend() {
 	if(mDecoderVideo != NULL) {
 		mDecoderVideo->stop();
 	}
-	
+
 	if(pthread_join(mPlayerThread, NULL) != 0) {
 		LOGE("Couldn't cancel player thread");
 	}
-	
+
 	// Close the codec
     if(mDecoderAudio != NULL) {
         delete mDecoderAudio;
@@ -244,7 +244,7 @@ status_t MediaPlayer::suspend() {
     if(mDecoderVideo != NULL) {
         delete mDecoderVideo;
     }
-	
+
 	// Close the video file
     avformat_close_input(&mAVFormatCtx);
 
@@ -254,7 +254,7 @@ status_t MediaPlayer::suspend() {
 bool MediaPlayer::shouldCancel(PacketQueue* queue)
 {
 	return (mCurrentState == MEDIA_PLAYER_STATE_ERROR || mCurrentState == MEDIA_PLAYER_STOPPED ||
-			 ((mCurrentState == MEDIA_PLAYER_DECODED || mCurrentState == MEDIA_PLAYER_STARTED) 
+			 ((mCurrentState == MEDIA_PLAYER_DECODED || mCurrentState == MEDIA_PLAYER_STARTED)
 			  && queue->size() == 0));
 }
 
@@ -384,7 +384,7 @@ void MediaPlayer::decodeAudioFrame(){
     av_free_packet(&mAudioPacket);
 }
 
-void MediaPlayer::doDecode(void* ptr)
+void MediaPlayer::demux(void* ptr)
 {
 	AVPacket pPacket;
 	
@@ -449,15 +449,13 @@ void MediaPlayer::doDecode(void* ptr)
 	}
 	
 	//waits on end of video thread
-	__android_log_print(ANDROID_LOG_ERROR, TAG, "waiting on video thread");
 	int ret = -1;
 	if((ret = mDecoderVideo->wait()) != 0) {
-		__android_log_print(ANDROID_LOG_ERROR, TAG, "Couldn't cancel video thread: %i", ret);
+		LOGE("Couldn't cancel video thread: %i", ret);
 	}
 	
-	__android_log_print(ANDROID_LOG_ERROR, TAG, "waiting on audio thread");
 	if((ret = mDecoderAudio->wait()) != 0) {
-		__android_log_print(ANDROID_LOG_ERROR, TAG, "Couldn't cancel audio thread: %i", ret);
+		LOGE("Couldn't cancel audio thread: %i", ret);
 	}
 
     deleteC(mAudioTrack);
@@ -482,10 +480,10 @@ void MediaPlayer::doDecode(void* ptr)
         mVideoFrame = NULL;
     }
 	if(mCurrentState == MEDIA_PLAYER_STATE_ERROR) {
-		__android_log_print(ANDROID_LOG_INFO, TAG, "playing err");
+		LOGE("playing err");
 	}
 	mCurrentState = MEDIA_PLAYER_PLAYBACK_COMPLETE;
-	__android_log_print(ANDROID_LOG_INFO, TAG, "end of playing");
+	LOGI("end of playing");
 }
 
 status_t MediaPlayer::stop()
@@ -569,7 +567,7 @@ void MediaPlayer::ffmpegNotify(void* ptr, int level, const char* fmt, va_list vl
 			 * Something went really wrong and we will crash now.
 			 */
 		case AV_LOG_PANIC:
-			__android_log_print(ANDROID_LOG_ERROR, TAG, "AV_LOG_PANIC: %s", fmt);
+			LOGI("AV_LOG_PANIC: %s", fmt);
 			//sPlayer->mCurrentState = MEDIA_PLAYER_STATE_ERROR;
 			break;
 			
@@ -579,7 +577,7 @@ void MediaPlayer::ffmpegNotify(void* ptr, int level, const char* fmt, va_list vl
 			 * on headers or an illegal combination of parameters is used.
 			 */
 		case AV_LOG_FATAL:
-			__android_log_print(ANDROID_LOG_ERROR, TAG, "AV_LOG_FATAL: %s", fmt);
+			LOGE("AV_LOG_FATAL: %s", fmt);
 			//sPlayer->mCurrentState = MEDIA_PLAYER_STATE_ERROR;
 			break;
 			
@@ -588,7 +586,7 @@ void MediaPlayer::ffmpegNotify(void* ptr, int level, const char* fmt, va_list vl
 			 * However, not all future data is affected.
 			 */
 		case AV_LOG_ERROR:
-			__android_log_print(ANDROID_LOG_ERROR, TAG, "AV_LOG_ERROR: %s", fmt);
+			LOGE("AV_LOG_ERROR: %s", fmt);
 			//sPlayer->mCurrentState = MEDIA_PLAYER_STATE_ERROR;
 			break;
 			
@@ -597,15 +595,15 @@ void MediaPlayer::ffmpegNotify(void* ptr, int level, const char* fmt, va_list vl
 			 * lead to problems. An example would be the use of '-vstrict -2'.
 			 */
 		case AV_LOG_WARNING:
-			__android_log_print(ANDROID_LOG_ERROR, TAG, "AV_LOG_WARNING: %s", fmt);
+			LOGD("AV_LOG_WARNING: %s", fmt);
 			break;
 			
 		case AV_LOG_INFO:
-			__android_log_print(ANDROID_LOG_INFO, TAG, "%s", fmt);
+			LOGI("%s", fmt);
 			break;
 			
 		case AV_LOG_DEBUG:
-			__android_log_print(ANDROID_LOG_DEBUG, TAG, "%s", fmt);
+            LOGD("%s", fmt);
 			break;
 			
 	}
