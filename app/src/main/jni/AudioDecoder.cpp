@@ -34,7 +34,8 @@ static int decodePacket(AVCodecContext *codecCtx, AVPacket *pPacket, AVFrame *pF
 	return decoded;
 }
 
-AudioDecoder::AudioDecoder() :pAVFormatCtx(NULL), audioTrack(-1), pFrame(NULL){
+AudioDecoder::AudioDecoder() :pAVFormatCtx(NULL), audioTrack(-1), pFrame(NULL),
+currentPostion(0), pSwrCtx(NULL), rawBuf(NULL), rawBufBytes(0){
 	if (false == globalInit) {
 		av_register_all();
 		avformat_network_init();
@@ -55,6 +56,13 @@ AudioDecoder::~AudioDecoder() {
 	}
 	if (pFrame) {
 		av_frame_free(&pFrame);
+	}
+	if (pSwrCtx) {
+		swr_free(&pSwrCtx);
+		pSwrCtx = NULL;
+	}
+	if (rawBuf) {
+		delete[]rawBuf;
 	}
 }
 
@@ -107,6 +115,13 @@ bool AudioDecoder::load(const char* url) {
 		return false;
 	}
 
+	if (codec_ctx->sample_fmt != AV_SAMPLE_FMT_S16) {
+		pSwrCtx = swr_alloc_set_opts(NULL,
+			codec_ctx->channel_layout, AV_SAMPLE_FMT_S16, codec_ctx->sample_rate,
+			codec_ctx->channel_layout, codec_ctx->sample_fmt,codec_ctx->sample_rate,
+			0, NULL);
+		swr_init(pSwrCtx);
+	}
 	return true;
 }
 
@@ -150,6 +165,10 @@ int64_t AudioDecoder::getDuration() {
 	return -1;
 }
 
+int64_t AudioDecoder::getCurrentPostion() {
+	return currentPostion;
+}
+
 int AudioDecoder::seekTo(int64_t ms) {
 	getAVStream(audioTrack);
 	if (pAVStream) {
@@ -158,6 +177,23 @@ int AudioDecoder::seekTo(int64_t ms) {
 			AVSEEK_FLAG_BACKWARD);
 	}
 	return -1;
+}
+
+bool AudioDecoder::convertSample(int sampleSize) {
+	if (pSwrCtx) {
+		if (!rawBuf || rawBufBytes < sampleSize) {
+			rawBufBytes = sampleSize;
+			if (rawBuf) {
+				delete[]rawBuf;
+			}
+			rawBuf = new uint8_t[sampleSize];
+		}
+		swr_convert(pSwrCtx,
+			&rawBuf, pFrame->nb_samples,
+			(const uint8_t**)pFrame->data, pFrame->nb_samples);
+		return true;
+	}
+	return false;
 }
 
 int AudioDecoder::readFrame(void **buf, int *sizeInBytes) {
@@ -183,12 +219,21 @@ int AudioDecoder::readFrame(void **buf, int *sizeInBytes) {
 			avpacket.size -= ret;
 			avpacket.data += ret;
 		} while (avpacket.size > 0);
+		currentPostion = avpacket.pts;
+
+		int desizeSampleSize = av_samples_get_buffer_size(NULL,
+				pCodecCtx->channels,
+				pFrame->nb_samples,
+				AV_SAMPLE_FMT_S16, 0);
+		
+		if (convertSample(desizeSampleSize)) {
+			*sizeInBytes = desizeSampleSize;
+			*buf = rawBuf;
+		}else {
+			*sizeInBytes = pFrame->nb_samples * av_get_bytes_per_sample((AVSampleFormat)(pFrame->format));
+			*buf = pFrame->extended_data[0];
+		}
 	}
 	av_free_packet(&avpacket);
-	*buf = pFrame->data[0];
-	*sizeInBytes = av_samples_get_buffer_size(NULL,
-		pCodecCtx->channels,
-		pFrame->nb_samples,
-		pCodecCtx->sample_fmt, 0);
 	return ret;
 }

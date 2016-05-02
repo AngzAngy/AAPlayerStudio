@@ -8,6 +8,7 @@ extern "C" {
 #include <libavutil/imgutils.h>
 #include <libavutil/mathematics.h>
 #include <libavutil/samplefmt.h>
+#include "libswresample/swresample.h"
 }
 #ifndef __AA_AUDIO_DECODER_H
 #define __AA_AUDIO_DECODER_H
@@ -22,15 +23,22 @@ public:
 	int bytesPerSample();
 	int getBitRate();
 	int64_t getDuration();
+	int64_t getCurrentPostion();
 	int seekTo(int64_t ms);
 	int readFrame(void **buf, int *sizeInBytes);
 private:
 	static bool globalInit;
 
+	bool convertSample(int sampleSize);
+
 	AVFormatContext *pAVFormatCtx;
 	int audioTrack;
 	AVPacket avpacket;
 	AVFrame *pFrame;
+	int64_t currentPostion;
+	struct SwrContext *pSwrCtx;
+	uint8_t* rawBuf;
+	int rawBufBytes;
 };
 
 #endif

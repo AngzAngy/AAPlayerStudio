@@ -69,6 +69,7 @@ LOCAL_SRC_FILES := \
     image-util.cpp \
     AudioTrack.cpp \
     SLESAudioTrack.cpp \
+    AudioDecoder.cpp \
     GLVideoJni.cpp
 
 LOCAL_LDLIBS := -llog  -landroid -lz -lGLESv2 -lOpenSLES
