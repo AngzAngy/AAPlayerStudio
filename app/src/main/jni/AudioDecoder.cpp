@@ -159,8 +159,12 @@ int AudioDecoder::getBitRate() {
 }
 
 int64_t AudioDecoder::getDuration() {
+	getAVStream(audioTrack);
+	if (pAVStream) {
+		return pAVStream->duration * av_q2d(pAVStream->time_base);
+	}
 	if (pAVFormatCtx) {
-		return pAVFormatCtx->duration;
+		return pAVFormatCtx->duration / AV_TIME_BASE;
 	}
 	return -1;
 }
