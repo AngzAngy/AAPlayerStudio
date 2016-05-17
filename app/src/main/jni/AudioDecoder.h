@@ -29,7 +29,7 @@ public:
 private:
 	static bool globalInit;
 
-	bool convertSample(int sampleSize);
+	int convertSample(AVCodecContext * pContext);
 
 	AVFormatContext *pAVFormatCtx;
 	int audioTrack;
@@ -37,8 +37,8 @@ private:
 	AVFrame *pFrame;
 	int64_t currentPostion;
 	struct SwrContext *pSwrCtx;
-	uint8_t* rawBuf;
-	int rawBufBytes;
+	uint8_t *dstData;
+	int maxSamples;
 };
 
 #endif

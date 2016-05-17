@@ -1,14 +1,18 @@
 #include "AudioDecoder.h"
+#include "jnilogger.h"
+
+const static AVSampleFormat OUT_FMT = AV_SAMPLE_FMT_S16;
 
 #define getAVStream(track) \
 	AVStream *pAVStream = NULL; \
 	if ((track) >= 0 && pAVFormatCtx) { \
 		pAVStream = pAVFormatCtx->streams[(track)]; \
-	} 
+		}
 
 bool AudioDecoder::globalInit = false;
 
 static int decodePacket(AVCodecContext *codecCtx, AVPacket *pPacket, AVFrame *pFrame, int *got_frame) {
+    //LOGI("in func:%s",__FUNCTION__);
 	int ret = 0;
 	int decoded = pPacket->size;
 
@@ -16,6 +20,7 @@ static int decodePacket(AVCodecContext *codecCtx, AVPacket *pPacket, AVFrame *pF
 
 	/* decode audio frame */
 	ret = avcodec_decode_audio4(codecCtx, pFrame, got_frame, pPacket);
+	//LOGI("decode_audio4 func:%s",__FUNCTION__);
 	if (ret < 0) {
 		return ret;
 	}
@@ -28,26 +33,30 @@ static int decodePacket(AVCodecContext *codecCtx, AVPacket *pPacket, AVFrame *pF
 	/* If we use the new API with reference counting, we own the data and need
 	* to de-reference it when we don't use it anymore */
 	//if (*got_frame && api_mode == API_MODE_NEW_API_REF_COUNT) {
-		//av_frame_unref(pFrame);
+	//av_frame_unref(pFrame);
 	//}
 
+//LOGI("out func:%s",__FUNCTION__);
 	return decoded;
 }
 
 AudioDecoder::AudioDecoder() :pAVFormatCtx(NULL), audioTrack(-1), pFrame(NULL),
-currentPostion(0), pSwrCtx(NULL), rawBuf(NULL), rawBufBytes(0){
-	if (false == globalInit) {
+currentPostion(0), pSwrCtx(NULL), dstData(NULL), maxSamples(0){
+  //  LOGI("in func:%s",__FUNCTION__);
+	//if (false == globalInit) {
 		av_register_all();
 		avformat_network_init();
 		avcodec_register_all();
-		globalInit = true;
-	}
+	//	globalInit = true;
+	//}
 
 	av_init_packet(&avpacket);
 	avpacket.data = NULL;
 	avpacket.size = 0;
 
 	pFrame = av_frame_alloc();
+
+	//LOGI("out func:%s",__FUNCTION__);
 }
 
 AudioDecoder::~AudioDecoder() {
@@ -61,12 +70,13 @@ AudioDecoder::~AudioDecoder() {
 		swr_free(&pSwrCtx);
 		pSwrCtx = NULL;
 	}
-	if (rawBuf) {
-		delete[]rawBuf;
-	}
+    if(dstData){
+        av_free(dstData);
+    }
 }
 
 bool AudioDecoder::load(const char* url) {
+    //LOGI("in func:%s",__FUNCTION__);
 	if (!url) {
 		return false;
 	}
@@ -115,13 +125,14 @@ bool AudioDecoder::load(const char* url) {
 		return false;
 	}
 
-	if (codec_ctx->sample_fmt != AV_SAMPLE_FMT_S16) {
+	if (codec_ctx->sample_fmt != OUT_FMT) {
 		pSwrCtx = swr_alloc_set_opts(NULL,
-			codec_ctx->channel_layout, AV_SAMPLE_FMT_S16, codec_ctx->sample_rate,
-			codec_ctx->channel_layout, codec_ctx->sample_fmt,codec_ctx->sample_rate,
+			codec_ctx->channel_layout, OUT_FMT, codec_ctx->sample_rate,
+			codec_ctx->channel_layout, codec_ctx->sample_fmt, codec_ctx->sample_rate,
 			0, NULL);
 		swr_init(pSwrCtx);
 	}
+	//LOGI("out func:%s",__FUNCTION__);
 	return true;
 }
 
@@ -159,50 +170,71 @@ int AudioDecoder::getBitRate() {
 }
 
 int64_t AudioDecoder::getDuration() {
-	getAVStream(audioTrack);
-	if (pAVStream) {
-		return pAVStream->duration * av_q2d(pAVStream->time_base);
-	}
+   //LOGI("in func:%s",__FUNCTION__);
+	int64_t duration = 0;
 	if (pAVFormatCtx) {
-		return pAVFormatCtx->duration / AV_TIME_BASE;
+		duration = av_rescale(pAVFormatCtx->duration, 1000, AV_TIME_BASE);
 	}
-	return -1;
+	//LOGI("out func:%s",__FUNCTION__);
+	return duration;
 }
 
 int64_t AudioDecoder::getCurrentPostion() {
-	return currentPostion;
+	int64_t pos = av_rescale(currentPostion, AV_TIME_BASE, 1000);
+	return pos;
 }
 
 int AudioDecoder::seekTo(int64_t ms) {
+    //LOGI("in func:%s",__FUNCTION__);
 	getAVStream(audioTrack);
 	if (pAVStream) {
 		int64_t timestamp = ms / (1000.0f * av_q2d(pAVStream->time_base));
 		return  av_seek_frame(pAVFormatCtx, audioTrack, timestamp,
 			AVSEEK_FLAG_BACKWARD);
 	}
+	//LOGI("out func:%s",__FUNCTION__);
 	return -1;
 }
 
-bool AudioDecoder::convertSample(int sampleSize) {
-	if (pSwrCtx) {
-		if (!rawBuf || rawBufBytes < sampleSize) {
-			rawBufBytes = sampleSize;
-			if (rawBuf) {
-				delete[]rawBuf;
-			}
-			rawBuf = new uint8_t[sampleSize];
+int  AudioDecoder::convertSample(AVCodecContext * pCodecCtx) {
+
+    int ret = -1;
+    int dst_linesize = 0;
+    getAVStream(audioTrack);
+	if (pSwrCtx && pAVStream) {
+        int srcRate = pAVStream->codec->sample_rate;
+      //  LOGI("in func:%s,,srcRate:%d,,nb_samples:%d",__FUNCTION__,srcRate,pFrame->nb_samples);
+        int dst_nb_samples = av_rescale_rnd(swr_get_delay(pSwrCtx, srcRate) + pFrame->nb_samples,
+            srcRate, srcRate, AV_ROUND_UP);
+        if (NULL == dstData || dst_nb_samples > maxSamples) {
+            if(dstData){
+                av_free(dstData);
+            }
+        //    LOGI("in av_samples_alloc,,dst_nb_samples:%d",dst_nb_samples);
+            ret = av_samples_alloc(&dstData, &dst_linesize, pAVStream->codec->channels,
+                                       dst_nb_samples, OUT_FMT, 0);
+          //  LOGI("in av_samples_alloc,,ret:%d",ret);
+            if (ret < 0){
+            //    LOGI(" av_samples_alloc fail func:%s",__FUNCTION__);
+                return ret;
+            }
+            maxSamples = dst_nb_samples;
 		}
-		swr_convert(pSwrCtx,
-			&rawBuf, pFrame->nb_samples,
+		//LOGI("convert func:%s,,bufVArrd:%ld",__FUNCTION__,dstData);
+		ret = swr_convert(pSwrCtx, &dstData, dst_nb_samples,
 			(const uint8_t**)pFrame->data, pFrame->nb_samples);
-		return true;
+		//LOGI("afterconvert func:%s,,ret:%d",__FUNCTION__,ret);
+	    ret = av_samples_get_buffer_size(&dst_linesize, pAVStream->codec->channels, ret, OUT_FMT, 0);
+	//	LOGI("afterconvert func:%s",__FUNCTION__);
 	}
-	return false;
+	return ret;
 }
 
 int AudioDecoder::readFrame(void **buf, int *sizeInBytes) {
-	int ret = 0;
+    //LOGI("in func:%s",__FUNCTION__);
+	int ret = -1;
 	int got_frame = 0;
+	//int isPlanar = 0;
 	getAVStream(audioTrack);
 	AVCodecContext *pCodecCtx = pAVStream->codec;
 	if (!buf || !sizeInBytes || !pAVStream) {
@@ -214,6 +246,7 @@ int AudioDecoder::readFrame(void **buf, int *sizeInBytes) {
 	if (ret < 0) {
 		return ret;
 	}
+	//isPlanar = av_sample_fmt_is_planar(pCodecCtx->sample_fmt);
 	if (audioTrack == avpacket.stream_index) {
 		do {
 			ret = decodePacket(pCodecCtx, &avpacket, pFrame, &got_frame);
@@ -225,19 +258,20 @@ int AudioDecoder::readFrame(void **buf, int *sizeInBytes) {
 		} while (avpacket.size > 0);
 		currentPostion = avpacket.pts;
 
-		int desizeSampleSize = av_samples_get_buffer_size(NULL,
-				pCodecCtx->channels,
-				pFrame->nb_samples,
-				AV_SAMPLE_FMT_S16, 0);
-		
-		if (convertSample(desizeSampleSize)) {
-			*sizeInBytes = desizeSampleSize;
-			*buf = rawBuf;
-		}else {
-			*sizeInBytes = pFrame->nb_samples * av_get_bytes_per_sample((AVSampleFormat)(pFrame->format));
-			*buf = pFrame->extended_data[0];
-		}
+        if(got_frame){
+            int sampleBytes = convertSample(pCodecCtx);
+            if (sampleBytes > 0) {
+                *sizeInBytes = sampleBytes;
+                *buf = dstData;
+      //          LOGI("outBytes:%d,func:%s",*sizeInBytes, __FUNCTION__);
+            }else {
+                *sizeInBytes = pFrame->nb_samples * av_get_bytes_per_sample((AVSampleFormat)(pFrame->format));
+                *buf = pFrame->data[0];
+            }
+	    }else{
+     	    ret = -1;
+     	}
 	}
 	av_free_packet(&avpacket);
+	//LOGI("out func:%s",__FUNCTION__);
 	return ret;
-}
