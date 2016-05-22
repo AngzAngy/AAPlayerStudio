@@ -180,8 +180,9 @@ int64_t AudioDecoder::getDuration() {
 }
 
 int64_t AudioDecoder::getCurrentPostion() {
-	int64_t pos = av_rescale(currentPostion, AV_TIME_BASE, 1000);
-	return pos;
+//	int64_t pos = av_rescale(currentPostion, AV_TIME_BASE, 1000);
+//	return pos;
+	return currentPostion;
 }
 
 int AudioDecoder::seekTo(int64_t ms) {
@@ -256,10 +257,14 @@ int AudioDecoder::readFrame(void **buf, int *sizeInBytes) {
 			avpacket.size -= ret;
 			avpacket.data += ret;
 		} while (avpacket.size > 0);
-		currentPostion = avpacket.pts;
 
-        if(got_frame){
-            int sampleBytes = convertSample(pCodecCtx);
+		if(got_frame){
+			if(AV_NOPTS_VALUE == (avpacket.pts)){
+				currentPostion = avpacket.dts * (1000.0f * av_q2d(pAVStream->time_base));
+			}else{
+				currentPostion = avpacket.pts * (1000.0f * av_q2d(pAVStream->time_base));
+			}
+			int sampleBytes = convertSample(pCodecCtx);
             if (sampleBytes > 0) {
                 *sizeInBytes = sampleBytes;
                 *buf = dstData;
@@ -275,3 +280,4 @@ int AudioDecoder::readFrame(void **buf, int *sizeInBytes) {
 	av_free_packet(&avpacket);
 	//LOGI("out func:%s",__FUNCTION__);
 	return ret;
+}
